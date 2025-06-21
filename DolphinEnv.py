@@ -72,13 +72,13 @@ class DolphinEnv:
     def __init__(self, num_envs, gamename="LC", gamefile="mkw.iso", project_folder=None,
                  games_folder=None):
 
-        script_directory = os.path.dirname(os.path.abspath(__file__))
+        script_directory = Path(os.path.dirname(os.path.abspath(__file__)))
 
         if(project_folder == None):
             project_folder = script_directory
 
         if(games_folder == None):
-            games_folder = script_directory + r"\\game\\"
+            games_folder = script_directory / "game"
 
         self.num_envs = num_envs
         self.gamename = gamename
@@ -181,11 +181,14 @@ class DolphinEnv:
         (self.instance_info_folder/'pid_num.txt').write_text(str(i))
         (self.instance_info_folder/f'instance_id{i}.txt').write_text(str(i))
 
+        exe_path = self.project_folder / f'dolphin{i}' / 'Dolphin.exe'
+        script_path = self.project_folder / 'DolphinScript.py'
+
         # launch the process
         cmd = (
-            f'cmd /c {self.project_folder}/dolphin{i}\\Dolphin.exe '
+            f'cmd /c {exe_path} '
             f'--no-python-subinterpreters '
-            f'--script "{self.project_folder}\\DolphinScript.py" '
+            f'--script "{script_path}" '
             f'\\b --exec="{self.games_folder/self.gamefile}"'
         )
         print(f"[Master] Opening File: {cmd}")
