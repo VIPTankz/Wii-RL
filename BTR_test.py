@@ -32,6 +32,7 @@ def main():
     parser.add_argument('--munch_alpha', type=float, default=0.9)
     parser.add_argument('--grad_clip', type=int, default=10)
 
+    parser.add_argument('--spectral', type=int, default=1)
     parser.add_argument('--discount', type=float, default=0.997)
     parser.add_argument('--taus', type=int, default=8)
     parser.add_argument('--c', type=int, default=500)
@@ -62,6 +63,7 @@ def main():
     maxpool_size = args.maxpool_size
     munch_alpha = args.munch_alpha
     grad_clip = args.grad_clip
+    spectral = args.spectral
     discount = args.discount
     linear_size = args.linear_size
     taus = args.taus
@@ -99,7 +101,7 @@ def main():
 
     agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 75, 140], device=device, num_envs=num_envs,
                   agent_name=agent_name, total_frames=n_steps, testing=True, batch_size=bs, lr=lr,
-                  maxpool_size=maxpool_size, target_replace=c, discount=discount, taus=taus,
+                  maxpool_size=maxpool_size, target_replace=c, spectral=spectral, discount=discount, taus=taus,
                   model_size=model_size, linear_size=linear_size, ncos=ncos, replay_period=replay_period,
                   framestack=framestack, per_alpha=per_alpha, layer_norm=layer_norm,
                   eps_steps=eps_steps, eps_disable=eps_disable, n=nstep,

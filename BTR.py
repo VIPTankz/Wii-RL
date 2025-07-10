@@ -175,7 +175,7 @@ class ImpalaCNNLargeIQN(nn.Module):
     """
     Implementation of the large variant of the IMPALA CNN introduced in Espeholt et al. (2018).
     """
-    def __init__(self, in_depth, actions, model_size=2, device='cuda:0', num_tau=8, maxpool_size=6,
+    def __init__(self, in_depth, actions, model_size=2, spectral=True, device='cuda:0', num_tau=8, maxpool_size=6,
                  linear_size=512, ncos=64, layer_norm=True):
         super().__init__()
 
@@ -203,7 +203,12 @@ class ImpalaCNNLargeIQN(nn.Module):
 
         linear_layer = FactorizedNoisyLinear
 
-        norm_func = torch.nn.utils.parametrizations.spectral_norm
+        def identity(p): return p
+
+        if spectral:
+            norm_func = torch.nn.utils.parametrizations.spectral_norm
+        else:
+            norm_func = identity
 
         self.conv = nn.Sequential(
             ImpalaCNNBlock(in_depth, int(16*model_size), norm_func=norm_func, activation=conv_activation,),
@@ -772,10 +777,10 @@ def choose_eval_action(observation, eval_net, n_actions, device, rng):
     return x
 
 
-def create_network(input_dims, n_actions, device, model_size, maxpool_size,
+def create_network(input_dims, n_actions, spectral_norm, device, model_size, maxpool_size,
                    linear_size, num_tau, ncos, layer_norm=True):
 
-    return ImpalaCNNLargeIQN(input_dims[0], n_actions, device=device,
+    return ImpalaCNNLargeIQN(input_dims[0], n_actions, spectral=spectral_norm, device=device,
                              model_size=model_size, num_tau=num_tau, maxpool_size=maxpool_size,
                              linear_size=linear_size, ncos=ncos, layer_norm=layer_norm)
 
@@ -784,7 +789,7 @@ def create_network(input_dims, n_actions, device, model_size, maxpool_size,
 
 class Agent:
     def __init__(self, n_actions, input_dims, device, num_envs, agent_name, total_frames, testing=False, batch_size=256
-                 , rr=1, maxpool_size=6, lr=1e-4, target_replace=500, discount=0.997, taus=8, model_size=2,
+                 , rr=1, maxpool_size=6, lr=1e-4, target_replace=500, spectral=True, discount=0.997, taus=8, model_size=2,
                  linear_size=512, ncos=64, non_factorised=False, replay_period=1, framestack=4, rgb=False, imagex=84,
                  imagey=84, per_alpha=0.2, max_mem_size=1048576, eps_steps=2000000, eps_disable=True, n=3,
                  munch_alpha=0.9, grad_clip=10, layer_norm=True, spi=1):
@@ -844,6 +849,8 @@ class Agent:
         self.model_size = model_size  # Scaling of IMPALA network
         self.maxpool_size = maxpool_size
 
+        self.spectral_norm = spectral
+
         # this option is only available for non-impala. I could add it, but factorised seemed
         # to perform the same and is faster
         self.non_factorised = non_factorised
@@ -884,9 +891,9 @@ class Agent:
         self.memory = PER(self.max_mem_size, device, self.n, num_envs, self.gamma, alpha=self.per_alpha,
                           beta=self.per_beta, framestack=self.framestack, rgb=self.rgb, imagex=imagex, imagey=imagey)
 
-        self.network_creator_fn = partial(create_network, self.input_dims, self.n_actions, self.device, self.model_size,
-                                          self.maxpool_size, self.linear_size, self.num_tau, self.ncos,
-                                          layer_norm=self.layer_norm)
+        self.network_creator_fn = partial(create_network, self.input_dims, self.n_actions, self.spectral_norm,
+                                          self.device, self.model_size, self.maxpool_size, self.linear_size,
+                                          self.num_tau, self.ncos, layer_norm=self.layer_norm)
 
         self.net = self.network_creator_fn()
         self.tgt_net = self.network_creator_fn()
@@ -1147,6 +1154,7 @@ def main():
     parser.add_argument('--munch_alpha', type=float, default=0.9)
     parser.add_argument('--grad_clip', type=int, default=10)
 
+    parser.add_argument('--spectral', type=int, default=1)
     parser.add_argument('--discount', type=float, default=0.997)
     parser.add_argument('--taus', type=int, default=8)
     parser.add_argument('--c', type=int, default=500)
@@ -1177,6 +1185,7 @@ def main():
     maxpool_size = args.maxpool_size
     munch_alpha = args.munch_alpha
     grad_clip = args.grad_clip
+    spectral = args.spectral
     discount = args.discount
     linear_size = args.linear_size
     taus = args.taus
@@ -1242,7 +1251,7 @@ def main():
 
     agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 75, 140], device=device, num_envs=num_envs,
                   agent_name=agent_name, total_frames=n_steps, testing=testing, batch_size=bs, lr=lr,
-                  maxpool_size=maxpool_size, target_replace=c, discount=discount, taus=taus,
+                  maxpool_size=maxpool_size, target_replace=c, spectral=spectral, discount=discount, taus=taus,
                   model_size=model_size, linear_size=linear_size, ncos=ncos, replay_period=replay_period,
                   framestack=framestack, per_alpha=per_alpha, layer_norm=layer_norm,
                   eps_steps=eps_steps, eps_disable=eps_disable, n=nstep,
