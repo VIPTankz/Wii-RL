@@ -102,7 +102,7 @@ class DolphinEnv:
         self.project_folder = Path(project_folder) if not isinstance(project_folder, Path) else project_folder
         self.games_folder = Path(games_folder) if not isinstance(games_folder, Path) else games_folder
         self._check_iso_validity()
-        self.instance_info_folder = Path('instance_info')
+        self.instance_info_folder = self.project_folder / Path('instance_info')
         self.instance_info_folder.mkdir(exist_ok=True)
 
         # write the number of envs for the slaves to read
@@ -161,7 +161,7 @@ class DolphinEnv:
             print("The ROM provided is valid.")
 
     def increment_alive(self, path='alive.txt'):
-        path = Path(path)
+        path = self.project_folder / Path(path)
         alive_num = int(path.read_text().strip()) if path.exists() else 0
         path.write_text(str(alive_num + 1))
         return alive_num
@@ -215,7 +215,7 @@ class DolphinEnv:
         print(f"[Master] Dolphin {i} connected!")
 
         # now proceed with your alive.txt + PID‐file handshake
-        alive_path = Path('alive.txt')
+        alive_path = self.project_folder / Path('alive.txt')
         while int(alive_path.read_text()) < alive_num + 2:
             time.sleep(0.05)
 

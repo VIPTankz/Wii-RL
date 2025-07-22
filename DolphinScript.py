@@ -38,14 +38,14 @@ except Exception as e:
     raise Exception("stop")
 
 def increment_alive(path='alive.txt'):
-    path = Path(path)
+    path = script_directory / Path(path)
     alive_num = int(path.read_text().strip()) if path.exists() else 0
     path.write_text(str(alive_num + 1))
     return alive_num
 
 save_states_path = script_directory / "MarioKartSaveStates"
 
-instance_info_folder = Path('instance_info')
+instance_info_folder = script_directory / Path('instance_info')
 
 # Read pid from pid_num.txt
 pid = int((instance_info_folder / 'pid_num.txt').read_text().strip())
@@ -68,10 +68,10 @@ def log_exc(exc: BaseException):
         f.write('\n\n')
 
 
-FILE_PATH = Path.cwd() / "shared_value.txt"
+FILE_PATH = script_directory / "shared_value.txt"
 
 if not FILE_PATH.exists():
-    FILE_PATH = Path.cwd().parent / "shared_value.txt"
+    FILE_PATH = script_directory.parent / "shared_value.txt"
 
 print(f"FILE_PATH: {FILE_PATH}")
 
