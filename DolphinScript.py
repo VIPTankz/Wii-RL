@@ -444,12 +444,9 @@ class DolphinInstance:
         # just make sure we don't list index out of range
         self.checkpoints.append(9999.)
 
-        # pick random state to reset to
-        x = random.randint(2, 8)
-
-        # reset environment back to savestate
-        save_state_path = save_states_path / f"RMCP01.s0{x}"
-        savestate.load_from_file(str(save_state_path))
+        # pick a random state to reset to
+        save_states = [file for file in Path(save_states_path).rglob('*') if file.is_file() and ".s" in str(file)]
+        savestate.load_from_file(str(random.choice(save_states)))
 
         self.memory_tracker = Memory()
 
