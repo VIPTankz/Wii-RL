@@ -9,3 +9,5 @@ torchsummary==1.5.1
 torchvision==0.22.1
 typing_extensions==4.12.2
 pynput
+requests
+tqdm

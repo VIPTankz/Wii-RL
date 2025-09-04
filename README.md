@@ -69,7 +69,14 @@ When you acquire the ROM, rename it to `mkw.iso` and put it in the directory `ga
 
 ---
 
-### 3. Setting Up This Repository
+### 3. Installing Libraries
+
+To install the relevant libraries, please do `pip install -r requirements.txt`.
+(We do also include `environment.yml` if you want to install via conda).
+
+---
+
+### 4. Setting Up This Repository
 
 To correctly allow this repo to interact with Dolphin, please follow these steps:
 
@@ -94,13 +101,6 @@ To correctly allow this repo to interact with Dolphin, please follow these steps
    ```sh
    python3 scripts/download_savestates.py
    ```
-
----
-
-### 4. Installing Libraries
-
-To install the relevant libraries, please do `pip install -r requirements.txt`.
-(We do also include `environment.yml` if you want to install via conda).
 
 ---
 
