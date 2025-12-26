@@ -203,11 +203,9 @@ class DolphinEnv:
                 f'\\b', f'--exec={self.games_folder/self.gamefile}'
             )
         elif(platform_name == "Darwin"):
-            exe_path = self.project_folder / f'dolphin{i}' / 'DolphinQt.app'
+            exe_path = self.project_folder / f'dolphin{i}' / 'DolphinQt.app' / 'Contents' / 'MacOS' / 'DolphinQt'
             cmd = (
-                f'open',
                 f'{exe_path}',
-                '--args',
                 f'--no-python-subinterpreters',
                 f'--script', f'{self.project_folder}/DolphinScript.py',
                 f'\\b', f'--exec={self.games_folder/self.gamefile}'
@@ -216,7 +214,20 @@ class DolphinEnv:
             raise RuntimeError(f"The operating system '{platform_name}' is not supported.")
 
         print(f"[Master] Opening File: {cmd}")
-        self.processes[i] = subprocess.Popen(cmd)
+        env = os.environ.copy()
+        if platform_name == "Darwin":
+            # Find Python 3.13 home for MPS compatibility
+            python_homes = [
+                os.path.expanduser('~/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none'),
+                '/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13',
+                '/opt/homebrew/Cellar/python@3.13/3.13.11/Frameworks/Python.framework/Versions/3.13',
+                '/Library/Frameworks/Python.framework/Versions/3.13',
+            ]
+            for path in python_homes:
+                if os.path.exists(path):
+                    env['PYTHONHOME'] = path
+                    break
+        self.processes[i] = subprocess.Popen(cmd, env=env)
 
         # wait for that slave to connect on our pre-bound socket
         print(f"[Master] Waiting for Dolphin {i} to connect…")

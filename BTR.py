@@ -22,6 +22,36 @@ This is the Beyond The Rainbow algorithm from ICML 2025 (https://arxiv.org/abs/2
 This is setup to play Mario Kart Wii.
 """
 
+############################################## MPS Spectral Norm Patch
+
+def _patch_spectral_norm_for_mps():
+    """
+    Patch PyTorch's spectral norm to work on MPS by replacing vdot with mul+sum.
+    vdot is not implemented for MPS, but the equivalent (a * b).sum() works.
+    """
+    from torch.nn.utils import parametrizations
+
+    def _metal_vdot(a, b):
+        return (a * b).sum()
+
+    original_forward = parametrizations._SpectralNorm.forward
+
+    def patched_forward(self, weight):
+        weight_mat = parametrizations._SpectralNorm._reshape_weight_to_matrix(self, weight)
+        if self.training:
+            with torch.no_grad():
+                for _ in range(self.n_power_iterations):
+                    self._v = F.normalize(torch.mv(weight_mat.t(), self._u), dim=0, eps=self.eps)
+                    self._u = F.normalize(torch.mv(weight_mat, self._v), dim=0, eps=self.eps)
+        sigma = _metal_vdot(self._u, torch.mv(weight_mat, self._v))
+        return weight / sigma
+
+    parametrizations._SpectralNorm.forward = patched_forward
+
+# Apply patch if MPS is available
+if torch.backends.mps.is_available():
+    _patch_spectral_norm_for_mps()
+
 ############################################## Networks Section
 
 class FactorizedNoisyLinear(nn.Module):
