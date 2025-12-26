@@ -127,7 +127,11 @@ def main():
     observation, info = env.reset()
     processes = []
 
-    summary(agent.net, (framestack, 75, 140))
+    # torchsummary only supports cuda/cpu, skip for mps
+    if device.type in ('cuda', 'cpu'):
+        summary(agent.net, (framestack, 75, 140), device=str(device))
+    else:
+        print(f"Skipping model summary (torchsummary doesn't support {device.type})")
 
     while steps < n_steps:
         steps += num_envs
