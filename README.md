@@ -5,7 +5,7 @@
 ---
 
 **Please watch the video which explains how to use this repository in detail!**  
-(COMING SOON)
+[(COMING SOON)](https://www.youtube.com/watch?v=zPQTg1L1M8U)
 
 ---
 
