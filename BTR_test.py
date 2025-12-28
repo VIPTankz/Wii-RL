@@ -6,7 +6,7 @@ import torch
 from torchsummary import summary
 from DolphinEnv import DolphinEnv
 
-from BTR import Agent, non_default_args, format_arguments
+from BTR import Agent, non_default_args, format_arguments, _patch_spectral_norm_for_mps
 
 def main():
     parser = argparse.ArgumentParser()
@@ -98,9 +98,11 @@ def main():
         device = torch.device('cuda:' + gpu if torch.cuda.is_available() else 'cpu')
     else:
         device = torch.device(device_name)
-    
-    print(f"\nDevice: {device}")
+        if device.type == 'mps':
+            _patch_spectral_norm_for_mps()
+            print("Applied MPS spectral norm patch (vdot workaround)")
 
+    print(f"\nDevice: {device}")
 
     env = DolphinEnv(envs)
     print(env.observation_space)
@@ -127,7 +129,11 @@ def main():
     observation, info = env.reset()
     processes = []
 
-    summary(agent.net, (framestack, 75, 140))
+    # torchsummary only supports cuda/cpu, skip for mps
+    if device.type in ('cuda', 'cpu'):
+        summary(agent.net, (framestack, 75, 140), device=str(device))
+    else:
+        print(f"Skipping model summary (torchsummary doesn't support {device.type})")
 
     while steps < n_steps:
         steps += num_envs

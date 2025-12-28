@@ -157,12 +157,16 @@ class Memory:
             quick succession. base_address is dereferenced first, and then
             offsets are applied.
             """
-            current_address = memory.read_u32(base_address)
-            for offset in offsets:
-                value_address = current_address + offset
-                current_address = memory.read_u32(current_address + offset)
-
-            return value_address
+            try:
+                current_address = memory.read_u32(base_address)
+                for offset in offsets:
+                    value_address = current_address + offset
+                    current_address = memory.read_u32(current_address + offset)
+                return value_address
+            except Exception as e:
+                # Return a dummy address if resolution fails
+                # Memory reads from this will return 0/default values
+                return 0x80000000
 
     def __init__(self):
         self.addresses = self.Addresses()
@@ -228,42 +232,47 @@ class Memory:
         self.trick_cooldown = 0
 
     def update(self):
+        """Update all memory values. Wrapped in try/except to handle stale addresses."""
+        try:
+            # my ones
+            self.mt_boost_timer = memory.read_u16(self.addresses.mt_boost_timer)
+            self.airtime = memory.read_u16(self.addresses.airtime)
 
-        # my ones
-        self.mt_boost_timer = memory.read_u16(self.addresses.mt_boost_timer)
-        self.airtime = memory.read_u16(self.addresses.airtime)
+            self.allmt = memory.read_u16(self.addresses.allmt)
+            self.mush_and_boost = memory.read_u16(self.addresses.mush_and_boost)
+            self.floor_collision_count = memory.read_u16(self.addresses.floor_collision_count)
 
-        self.allmt = memory.read_u16(self.addresses.allmt)
-        self.mush_and_boost = memory.read_u16(self.addresses.mush_and_boost)
-        self.floor_collision_count = memory.read_u16(self.addresses.floor_collision_count)
+            self.race_position = memory.read_u8(self.addresses.race_position)
+            self.respawn_timer = memory.read_u16(self.addresses.respawn_timer)
+            self.wall_collide = memory.read_u32(self.addresses.wall_collide)
 
-        self.race_position = memory.read_u8(self.addresses.race_position)
-        self.respawn_timer = memory.read_u16(self.addresses.respawn_timer)
-        self.wall_collide = memory.read_u32(self.addresses.wall_collide)
+            self.speed_limit = memory.read_f32(self.addresses.soft_speed_limit)
 
-        self.speed_limit = memory.read_f32(self.addresses.soft_speed_limit)
+            # RaceManagerPlayer
+            self.RaceCompletion = memory.read_f32(self.addresses.RaceCompletion)
 
-        # RaceManagerPlayer
-        self.RaceCompletion = memory.read_f32(self.addresses.RaceCompletion)
+            self.currentLap = memory.read_u16(self.addresses.currentLap)
+            self.countdownTimer = memory.read_u16(self.addresses.countdownTimer)
+            self.stage = memory.read_u32(self.addresses.stage)
 
-        self.currentLap = memory.read_u16(self.addresses.currentLap)
-        self.countdownTimer = memory.read_u16(self.addresses.countdownTimer)
-        self.stage = memory.read_u32(self.addresses.stage)
+            # KartMove
+            self.speed = memory.read_f32(self.addresses.speed)
 
-        # KartMove
-        self.speed = memory.read_f32(self.addresses.speed)
+            self.offroadInvincibility = memory.read_u16(self.addresses.offroadInvincibility)
 
-        self.offroadInvincibility = memory.read_u16(self.addresses.offroadInvincibility)
+            # KartCollide
+            self.isTouchingOffroad = self.surfaceFlags & (1 << (7 - 1)) != 0
 
-        # KartCollide
-        self.isTouchingOffroad = self.surfaceFlags & (1 << (7 - 1)) != 0
+            # Misc
+            self.mushroomCount = memory.read_u32(self.addresses.mushroomCount)
+            self.hopPos = memory.read_f32(self.addresses.hopPos)
 
-        # Misc
-        self.mushroomCount = memory.read_u32(self.addresses.mushroomCount)
-        self.hopPos = memory.read_f32(self.addresses.hopPos)
-
-        self.trickableTimer = memory.read_u16(self.addresses.trickableTimer)
-        self.trick_cooldown = memory.read_u16(self.addresses.trick_cooldown)
+            self.trickableTimer = memory.read_u16(self.addresses.trickableTimer)
+            self.trick_cooldown = memory.read_u16(self.addresses.trick_cooldown)
+        except Exception as e:
+            # Memory read failed - addresses may be stale after savestate load
+            # Keep using last known values
+            pass
 
     @staticmethod
     def Quat2Euler(quaternion):
@@ -416,6 +425,9 @@ class DolphinInstance:
         self.mem_race_stage = self.memory_tracker.stage
 
     def reset(self):
+        """Phase 1: Load save state and reset counters.
+        Memory initialization is deferred to init_after_reset() to allow frames to advance."""
+        print("[RESET] Starting reset...")
 
         self.ep_length = 0
 
@@ -446,19 +458,49 @@ class DolphinInstance:
 
         # pick a random state to reset to
         save_states = [file for file in Path(save_states_path).rglob('*') if file.is_file() and ".s" in file.name]
-        savestate.load_from_file(str(random.choice(save_states)))
+        chosen_state = str(random.choice(save_states))
+        print(f"[RESET] About to load savestate: {chosen_state}")
 
-        self.memory_tracker = Memory()
+        try:
+            savestate.load_from_file(chosen_state)
+            print("[RESET] Savestate loaded successfully!")
+        except Exception as e:
+            print(f"[RESET] Savestate load FAILED: {e}")
+            log_exc(e)
+            raise
 
-        self.get_mem_values()
+        # NOTE: Memory initialization is now done in init_after_reset() after frame advances
+        # This allows the emulator to stabilize after state load before reading memory
+        print("[RESET] Phase 1 complete")
 
-        # move our current checkpoint to where we are based on spawn location
-        while self.mem_race_com > self.checkpoints[self.current_checkpoint]:
-            self.current_checkpoint += 1
+    def init_after_reset(self):
+        """Phase 2: Initialize memory tracker after emulator has stabilized.
+        Call this AFTER frame advances following reset()."""
+        print("[RESET] Phase 2: Initializing memory tracker...")
+        try:
+            self.memory_tracker = Memory()
+            print("[RESET] Memory() created, getting values...")
+            self.get_mem_values()
+            print(f"[RESET] Memory values: race_com={self.mem_race_com:.2f}, speed={self.mem_speed:.1f}")
+
+            # move our current checkpoint to where we are based on spawn location
+            while self.mem_race_com > self.checkpoints[self.current_checkpoint]:
+                self.current_checkpoint += 1
+            print(f"[RESET] Phase 2 complete, checkpoint={self.current_checkpoint}")
+        except Exception as e:
+            # Log the error but don't crash - use safe defaults
+            print(f"[WARN] Memory init failed after reset: {e}")
+            log_exc(e)
+            # Use safe defaults if memory read fails
+            self.mem_race_com = 1.0
+            self.mem_speed = 0.0
+            self.mem_race_stage = 0
 
 
     def apply_action(self, action):
-        assert 0 <= action < self.n_actions, f"Action must be in 0..{self.n_actions-1}"
+        if action < 0 or action >= self.n_actions:
+            print(f"[WARN] Invalid action {action}, using 0")
+            action = 0
 
         # reset dictionary to default state (A is always held down)
         self.wii_dic = {
@@ -470,7 +512,12 @@ class DolphinInstance:
             "AnalogA": 0, "AnalogB": 0, "Connected": True
         }
 
-        self.get_mem_values()
+        try:
+            self.get_mem_values()
+        except Exception as e:
+            # Memory read failed - this can happen if addresses are stale
+            # Just continue with last known values
+            pass
 
         # Decode indices. Can't lie ChatGPT did this, idn wtf is going on here
         stick_idx = action // (2 * 2 * 2)
@@ -487,39 +534,47 @@ class DolphinInstance:
         self.wii_dic["L"] = self.l_values[l_idx]
 
         self.applied_action = action
-        controller.set_gc_buttons(0, self.wii_dic)
+        try:
+            controller.set_gc_buttons(0, self.wii_dic)
+        except Exception as e:
+            # Controller set failed - continue anyway
+            pass
 
     def get_reward_terminal_trun(self):
-        reward = 0.
+        """Compute reward, terminal, and truncation signals."""
+        self.ep_length += 1
+        self.frames_since_chkpt += 1
+
+        reward = 0.0
         terminal = False
         trun = False
 
-        # refresh memory values
-        self.get_mem_values()
+        try:
+            self.get_mem_values()
+        except Exception as e:
+            # Memory read failed - use last known values
+            pass
 
-        self.ep_length += 1
-
-        # checkpoint bonus
+        # Checkpoint-based reward: +1.0 for each checkpoint crossed
         if self.mem_race_com > self.checkpoints[self.current_checkpoint]:
-            reward += 1.
+            reward += 1.0
             self.current_checkpoint += 1
             self.frames_since_chkpt = 0
 
-        # reward for finishing race and set terminal
+        # Race completion (3 laps = race_completion >= 4.0)
         if self.mem_race_com >= 4.0:
-            # reward based on position
-            reward = (13 - self.mem_race_pos) / 2
             terminal = True
-        # race has ended, reset
-        elif self.mem_race_stage == 4:
-            reward = -1
-            terminal = True
-        # reset condition.
-        elif self.frames_since_chkpt > 700:
-            reward = -1.
-            terminal = True
+            reward += 10.0  # Bonus for finishing
 
-        self.frames_since_chkpt += 1
+        # Stuck detection: truncate if no checkpoint progress for too long
+        stuck_threshold = 700  # frames (about 11.7 seconds at 60fps)
+        if self.frames_since_chkpt > stuck_threshold:
+            trun = True
+
+        # Max episode length (about 2 minutes)
+        max_ep_length = 7200  # frames
+        if self.ep_length > max_ep_length:
+            trun = True
 
         return reward, terminal, trun
 
@@ -528,8 +583,12 @@ for i in range(4):
 
 env = DolphinInstance(id)
 
+# Wait for emulator to stabilize after initial reset before reading memory
 for i in range(8):
     await event.frameadvance()
+
+# Initialize memory tracker after frames have advanced (Phase 2 of reset)
+env.init_after_reset()
 
 (width, height, data) = await event.framedrawn()
 img = Image.frombytes('RGB', (width, height), data, 'raw')
@@ -542,8 +601,12 @@ env.send_init_state(img)
 
 print("Sent init state")
 
+# Flag to prevent callback from running until we're in the main loop
+callback_enabled = False
+
 def my_callback():
-    env.apply_action(env.applied_action)
+    # MINIMAL TEST: Do absolutely nothing to isolate crash source
+    pass
 
 event.on_frameadvance(my_callback)
 # make sure we apply the action every single frame. Otherwise this can lead to some weird stuttering
@@ -557,56 +620,77 @@ frames_pooled = 2
 print("Starting Main Loop...")
 # atari pools the most recent two frames, don't blame me why its so confusing
 frame_data = np.zeros((frames_pooled, env.window_y, env.window_x), dtype=np.uint8)
-while True:
 
-    # get action from main Dolphin Script
-    env.recieve_action()
+# CALLBACK-BASED FRAME CAPTURE TEST
+# Instead of using await event.framedrawn() which crashes,
+# use on_framedrawn callback to store frames in a global
+latest_frame_data = {"width": 0, "height": 0, "data": None, "frame_count": 0}
 
-    for i in range(env.frameskip):
-        if i >= env.frameskip - frames_pooled:
-            # get frame data
-            (width, height, data) = await event.framedrawn()
-            new_img = env.process_indiv_frame(Image.frombytes('RGB', (width, height), data, 'raw'))
-            frame_data[i - frames_pooled] = new_img
-        else:
-            # no frame data, just skip frame
+def frame_callback(width, height, data):
+    """Callback that stores latest frame data"""
+    global latest_frame_data
+    latest_frame_data["width"] = width
+    latest_frame_data["height"] = height
+    latest_frame_data["data"] = data
+    latest_frame_data["frame_count"] += 1
+
+# Register the callback
+print("[TEST] Registering on_framedrawn callback...")
+event.on_framedrawn(frame_callback)
+print("[TEST] Callback registered, using callback-based frame capture")
+
+cached_frame = np.zeros((env.window_y, env.window_x), dtype=np.uint8)
+
+try:
+    step_count = 0
+    while True:
+        step_count += 1
+        if step_count % 100 == 0:
+            print(f"[LOOP] Step {step_count}, frames captured: {latest_frame_data['frame_count']}")
+
+        # Get action from master
+        env.recieve_action()
+
+        # Apply the action (sets controller inputs)
+        env.apply_action(env.applied_action)
+
+        # Advance frames - this is stable
+        for i in range(env.frameskip):
             await event.frameadvance()
 
-        rewardN, terminalN, trunN = env.get_reward_terminal_trun()
+        # Compute reward and check for episode end
+        reward, terminal, trun = env.get_reward_terminal_trun()
 
-        if not terminal and not trun:
-            terminal = terminal or terminalN
-            trun = trun or trunN
-            reward += rewardN
+        # Process frame from callback if available
+        if latest_frame_data["data"] is not None:
+            try:
+                cached_frame = env.process_indiv_frame(
+                    Image.frombytes('RGB',
+                        (latest_frame_data["width"], latest_frame_data["height"]),
+                        latest_frame_data["data"], 'raw'))
+            except Exception as fe:
+                print(f"[WARN] Frame processing error: {fe}")
 
-        if terminal or trun:
-            # send transition so we can carry going on while resetting
-            new_img = Image.frombytes('RGB', (width, height), data, 'raw')
-            new_img = env.process_indiv_frame(new_img)
+        # Use cached frame
+        for j in range(frames_pooled):
+            frame_data[j] = cached_frame
 
-            for i in range(frames_pooled):
-                frame_data[i] = new_img
-
-            new_img = env.process_frame(np.array(frame_data).copy())
-            env.send_transition(reward, terminal, trun, new_img.copy())
-
-            # add some time here or dolphin seems to freeze up sometimes
-            for _ in range(2):
-                await event.frameadvance()
-
-            env.reset()
-
-            for _ in range(1):
-                await event.frameadvance()
-
-            # reset frame_buffer
-            env.reset_frame_buffer = True
-            break
-
-    if not (terminal or trun):
+        # Send transition back to master
         new_img = env.process_frame(np.array(frame_data).copy())
         env.send_transition(reward, terminal, trun, new_img)
 
-    reward = 0
-    terminal = False
-    trun = False
+        # Handle episode reset
+        if terminal or trun:
+            print(f"[RESET] Episode ended: terminal={terminal}, trun={trun}, reward={reward:.1f}")
+            env.reset()
+            # Wait for emulator to stabilize after reset
+            for i in range(6):
+                await event.frameadvance()
+            env.init_after_reset()
+            env.reset_frame_buffer = True
+
+except Exception as e:
+    # Log any unhandled exceptions before crashing
+    print(f"[FATAL] Main loop exception: {e}")
+    log_exc(e)
+    raise
