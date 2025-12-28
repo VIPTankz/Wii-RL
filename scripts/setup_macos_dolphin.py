@@ -3,10 +3,16 @@
 Setup script for macOS M-series (Apple Silicon) Dolphin compatibility.
 
 The bundled Dolphin has Python 3.13.5 embedded but is missing the standard library.
-This script downloads Python 3.13.5 from python.org and copies the stdlib into each
-Dolphin instance's framework bundle.
+This script downloads Python 3.13.5 from python.org and copies the stdlib into the
+dolphin0 framework bundle.
 
-Run this after clone_dolphins.py and before running BTR.py or BTR_test.py on macOS.
+Run this BEFORE clone_dolphins.py so the stdlib gets copied to all instances automatically.
+
+Usage:
+    1. python scripts/download_dolphin.py
+    2. python scripts/setup_macos_dolphin.py   <-- this script
+    3. python scripts/clone_dolphins.py
+    4. python BTR.py --device mps
 """
 
 import os
@@ -26,21 +32,22 @@ def main():
         return
 
     project_dir = Path(__file__).parent.parent
-    dolphin_dirs = sorted(project_dir.glob("dolphin*"))
+    dolphin0 = project_dir / "dolphin0"
 
-    if not dolphin_dirs:
-        print("No dolphin directories found. Run download_dolphin.py and clone_dolphins.py first.")
+    if not dolphin0.exists():
+        print("dolphin0 not found. Run download_dolphin.py first.")
         return
 
-    print(f"Found {len(dolphin_dirs)} Dolphin instance(s): {[d.name for d in dolphin_dirs]}")
+    framework_path = dolphin0 / "DolphinQt.app" / "Contents" / "Frameworks" / "Python.framework" / "Versions" / "3.13"
+    if not framework_path.exists():
+        print(f"Error: Python framework not found at {framework_path}")
+        return
 
-    # Check if stdlib is already installed
-    first_dolphin = dolphin_dirs[0]
-    lib_path = first_dolphin / "DolphinQt.app" / "Contents" / "Frameworks" / "Python.framework" / "Versions" / "3.13" / "lib"
+    lib_path = framework_path / "lib"
     dynload_path = lib_path / "python3.13" / "lib-dynload"
 
     if dynload_path.exists() and any(dynload_path.glob("*.so")):
-        print("Python stdlib already installed in Dolphin bundles.")
+        print("Python stdlib already installed in dolphin0.")
         response = input("Reinstall? [y/N] ").strip().lower()
         if response != 'y':
             print("Skipping installation.")
@@ -83,25 +90,15 @@ def main():
             print(f"Error: Could not find lib directory at {src_lib}")
             return
 
-        # Copy to each Dolphin instance
-        for dolphin_dir in dolphin_dirs:
-            framework_path = dolphin_dir / "DolphinQt.app" / "Contents" / "Frameworks" / "Python.framework" / "Versions" / "3.13"
+        # Remove existing lib if present
+        if lib_path.exists():
+            shutil.rmtree(lib_path)
 
-            if not framework_path.exists():
-                print(f"Warning: {framework_path} does not exist, skipping {dolphin_dir.name}")
-                continue
+        print("Copying stdlib to dolphin0...")
+        shutil.copytree(src_lib, lib_path)
 
-            dst_lib = framework_path / "lib"
-
-            # Remove existing lib if present
-            if dst_lib.exists():
-                shutil.rmtree(dst_lib)
-
-            print(f"Copying stdlib to {dolphin_dir.name}...")
-            shutil.copytree(src_lib, dst_lib)
-
-    print("\nDone! Python stdlib installed in all Dolphin instances.")
-    print("You can now run BTR.py or BTR_test.py with --device mps")
+    print("\nDone! Python stdlib installed in dolphin0.")
+    print("Now run clone_dolphins.py to copy to all instances, then run BTR.py --device mps")
 
 
 if __name__ == "__main__":

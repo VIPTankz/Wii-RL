@@ -48,9 +48,7 @@ def _patch_spectral_norm_for_mps():
 
     parametrizations._SpectralNorm.forward = patched_forward
 
-# Apply patch if MPS is available
-if torch.backends.mps.is_available():
-    _patch_spectral_norm_for_mps()
+# Note: _patch_spectral_norm_for_mps() is called later only when --device mps is used
 
 ############################################## Networks Section
 
@@ -1280,6 +1278,9 @@ def main():
     else:
         device = torch.device(device_name)
         print(f"\nDevice: {device}")
+        if device.type == 'mps':
+            _patch_spectral_norm_for_mps()
+            print("Applied MPS spectral norm patch (vdot workaround)")
 
     env = DolphinEnv(envs)
     print(env.observation_space)
