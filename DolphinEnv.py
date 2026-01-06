@@ -71,7 +71,7 @@ def set_shared_site():
 
 class DolphinEnv:
     def __init__(self, num_envs, gamename="LC", gamefile="mkw.iso", project_folder=None,
-                 games_folder=None):
+                 games_folder=None, headless=False):
 
         script_directory = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -84,6 +84,7 @@ class DolphinEnv:
         self.num_envs = num_envs
         self.gamename = gamename
         self.gamefile = gamefile
+        self.headless = headless
 
         set_value(99999.)
 
@@ -196,22 +197,38 @@ class DolphinEnv:
             )
         elif(platform_name == "Linux"):
             exe_path = self.project_folder / f'dolphin{i}' / 'dolphin-emu'
-            cmd = (
-                f'{exe_path}',
-                f'--no-python-subinterpreters',
-                f'--script', f'{self.project_folder}/DolphinScript.py',
-                f'\\b', f'--exec={self.games_folder/self.gamefile}'
-            )
+            if self.headless:
+                cmd = (
+                    f'{exe_path}',
+                    '-b',
+                    f'--no-python-subinterpreters',
+                    f'--script', f'{self.project_folder}/DolphinScript.py',
+                    f'--exec={self.games_folder/self.gamefile}'
+                )
+            else:
+                cmd = (
+                    f'{exe_path}',
+                    f'--no-python-subinterpreters',
+                    f'--script', f'{self.project_folder}/DolphinScript.py',
+                    f'--exec={self.games_folder/self.gamefile}'
+                )
         elif(platform_name == "Darwin"):
-            exe_path = self.project_folder / f'dolphin{i}' / 'DolphinQt.app'
-            cmd = (
-                f'open',
-                f'{exe_path}',
-                '--args',
-                f'--no-python-subinterpreters',
-                f'--script', f'{self.project_folder}/DolphinScript.py',
-                f'\\b', f'--exec={self.games_folder/self.gamefile}'
-            )
+            exe_path = self.project_folder / f'dolphin{i}' / 'DolphinQt.app' / 'Contents' / 'MacOS' / 'DolphinQt'
+            if self.headless:
+                cmd = (
+                    f'{exe_path}',
+                    '-b',
+                    f'--no-python-subinterpreters',
+                    f'--script', f'{self.project_folder}/DolphinScript.py',
+                    f'--exec={self.games_folder/self.gamefile}'
+                )
+            else:
+                cmd = (
+                    f'{exe_path}',
+                    f'--no-python-subinterpreters',
+                    f'--script', f'{self.project_folder}/DolphinScript.py',
+                    f'--exec={self.games_folder/self.gamefile}'
+                )
         else:
             raise RuntimeError(f"The operating system '{platform_name}' is not supported.")
 
@@ -292,7 +309,10 @@ class DolphinEnv:
                 truns.append(trun)
 
                 if done or trun:
-                    self.is_resetting[i] = 8
+                    # Grace period for reset: 2 frames before + 4 frames after state load + buffer
+                    # Slave does ~6 frame advances during reset, with frameskip=4 that's ~2 env steps
+                    # Add extra buffer for state load I/O latency
+                    self.is_resetting[i] = 20
 
                 infos["final_observation"].append(None)
                 if self.firsts[i]:
@@ -343,12 +363,17 @@ class DolphinEnv:
             except:
                 pass
 
+        # Kill the script process (cross-platform)
         try:
-            subprocess.check_output("Taskkill /PID %d /F" % self.script_pids[i])
+            import platform
+            if platform.system() == "Windows":
+                subprocess.check_output("Taskkill /PID %d /F" % self.script_pids[i])
+            else:
+                # macOS/Linux: use kill
+                os.kill(self.script_pids[i], signal.SIGKILL)
             print("Minor Crash... Recovering successfully")
-        except:
-            print("Failed to kill by subprocess PID")
-            print("Something bad will happen now")
+        except Exception as e:
+            print(f"Failed to kill script PID {self.script_pids[i]}: {e}")
 
         # 3) close old socket
         old = self.listeners[i]
@@ -358,7 +383,7 @@ class DolphinEnv:
         self.listeners[i] = None
 
         # wait to allow the process to die
-        time.sleep(1.0)
+        time.sleep(0.3)
 
         # 4) re‐launch and accept
         self.create_dolphin(i)
