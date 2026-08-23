@@ -129,7 +129,7 @@ While we provide code to train your own models, we also include a model for you 
 
 To first test whether everything is set up as intended, we recommend first running `python BTR_test.py --model_path YOUR_MODEL_PATH_HERE`. This will run the pretrained model installed in the last step, in two emulators in parallel.
 
-To test if training on your machine works quickly, you can also run `python BTR.py --testing 1`.
+To test if training on your machine works quickly, you can also run `python BTR.py --testing`.
 
 To actually do your own training, simply run `python BTR.py`. This will use 4 instances of dolphin by default. This will put quite some strain on most PCs, so you may want to reduce this to 2 or 1 (You can also do 8 if you have a crazy good machine and don't mind your fans going crazy).
 
