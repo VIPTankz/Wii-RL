@@ -122,12 +122,24 @@ To correctly allow this repo to interact with Dolphin, please follow these steps
 
 ### 5. Download a Pre-Trained Model
 
-While we provide code to train your own models, we also include a model for you to run and test. To use this model, download the pytorch model file from `https://github.com/VIPTankz/Wii-RL/releases/tag/model`, and place this in this directory.
+While we provide code to train your own models, we also include a pretrained checkpoint for testing. Download the `.model` file from the [model release](https://github.com/VIPTankz/Wii-RL/releases/tag/model) and place it in the repository root, next to `BTR_test.py`.
+
+Then run:
+
+```sh
+python BTR_test.py --model_path ./YOUR_MODEL_FILENAME.model
+```
+
+On Windows, you can use:
+
+```powershell
+python BTR_test.py --model_path .\YOUR_MODEL_FILENAME.model
+```
 
 ---
 ### 6. Running The AI with Dolphin
 
-To first test whether everything is set up as intended, we recommend first running `python BTR_test.py --model_path YOUR_MODEL_PATH_HERE`. This will run the pretrained model installed in the last step, in two emulators in parallel.
+To first test whether everything is set up as intended, run `python BTR_test.py --model_path ./YOUR_MODEL_FILENAME.model` using the actual filename of the checkpoint downloaded in the previous step. This will run the pretrained model in two emulators in parallel.
 
 To test if training on your machine works quickly, you can also run `python BTR.py --testing`.
 
