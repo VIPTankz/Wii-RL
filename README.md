@@ -71,8 +71,24 @@ When you acquire the ROM, rename it to `mkw.iso` and put it in the directory `ga
 
 ### 3. Installing Libraries
 
-To install the relevant libraries, please do `pip install -r requirements.txt`.
-(We do also include `environment.yml` if you want to install via conda).
+To install the relevant libraries with pip, choose the requirements file for your setup.
+
+For an NVIDIA GPU using CUDA 11.8:
+
+```sh
+python -m pip install -r requirements.txt
+```
+
+For a CPU-only Windows or Linux installation:
+
+```sh
+python -m pip install -r requirements_cpu.txt
+```
+
+The CUDA-specific requirements file is not intended for macOS. For macOS/MPS,
+install a PyTorch build compatible with your Python version and platform, then
+install the remaining dependencies. We also include `environment.yml` if you
+want to install via conda.
 
 ---
 
