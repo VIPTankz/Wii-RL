@@ -1151,7 +1151,7 @@ def main():
     parser.add_argument('--nstep', type=int, default=3)
     parser.add_argument('--maxpool_size', type=int, default=6)
     parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--testing', type=bool, default=False)
+    parser.add_argument('--testing', action='store_true')
     parser.add_argument('--munch_alpha', type=float, default=0.9)
     parser.add_argument('--grad_clip', type=int, default=10)
 

@@ -25,3 +25,8 @@ pid_num.txt
 instance_id0.txt
 id_num.txt
 alive.txt
+
+# Training outputs
+*.model
+*Experiment.npy
+scores_over_time_smoothed.png

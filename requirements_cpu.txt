@@ -4,9 +4,7 @@ matplotlib==3.10.3
 numpy==2.2.6
 pillow==11.2.1
 torch==2.7.1+cpu
-torchaudio==2.7.1+cpu
 torchsummary==1.5.1
-torchvision==0.22.1
 typing_extensions==4.12.2
 pynput
 requests
